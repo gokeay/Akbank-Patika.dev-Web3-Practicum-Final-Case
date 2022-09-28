@@ -1,107 +1,112 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
+// import "./ownable.sol";
 import "./safemath.sol";
+// import "github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/EnumerableSet.sol";
 
-library CarGalery {
-
-    function changeName() public pure {
-
-    }
-
-    function putOnSale() public {
-
-    }
-
-    function changePrice() public {
-
-    }
-}
-
-contract car_production {
+contract car_production{
 
     using SafeMath for uint256;
+    // using EnumerableSet for EnumerableSet.UintSet;
+    // EnumerableSet.UintSet private myUintSet;
 
     address ownerAddress;
-    //uint customer_count = 1;
+
+    event carAdded(uint carId, address indexed owner);
+
+    event carSold(
+        uint carId,
+        address indexed newOwner,
+        address indexed previousOwner,
+        uint price
+    );
+
+    event priceChanged(
+        uint carId,
+        address indexed owner,
+        uint previousPrice,
+        uint newPrice
+    );
+
+    event statusChanced(uint carId, bool onSale);
+
+    // It is used to generate id for new cars.
+    uint carId;
 
     struct Car {
-        string brand;
-        uint price;
-        bool isSecondHand;
-        bool is_selling;
+        string brand; // Brand of car
+        uint price; // Price of car
+        bool is_second_hand; // Status of car
     }
 
-    // struct Customer {
-    //     string name;
-    //     address adres;
-    // } .. gerek yok buna
+    Car[] onSaleCars;
+    Car[] public cars;
+    // add(uintSet storage myUintSet, uint256 5);
 
-    Car[] on_sale_cars;
-    Car[] public cars;  //==> her araba kendi numarasina numarasi da markasina bagli oldugu icin ekstradan bir listede toplamaya gerek yok.
-    // Customer[] public customers; //==> yine ayni sekiled, bu toplam isimleri vs daha farkli alicam ileride, boyle gereksiz gas harcamasina gerek yok.
+    // Mapping from car"s Id to owner address
+    mapping(uint => address) public carToOwner;
+    // Mapping from owner address to amount of owner`s car
+    mapping(address => uint) public customerCarCount;
+    // Mapping from car`s Id to sales status of car
+    mapping(uint => bool) public isSelling;
 
-    mapping(uint => address) carToOwner;
-    mapping(address => uint) customer_car_count;
-    //mapping(address => bool) public is_registered; //bunu modifier ekleyerek hallettim 
-    //mapping(string => mapping(uint => bool)) public is_there_car; // bunu da yine modifier ile hallettim
-    //mapping(uint => address) carToOwner;         //mapping(Car => address) carToOwner; // boyle bir sey olur mu?
-    //mapping(address => uint) customer_Id;
-    
     constructor() {
         ownerAddress = msg.sender;
     }
 
-    modifier _is_there(uint _car_Id) {
-        require(cars[_car_Id], "Car already joined the chain!");
-        _;
-    }
-
-    modifier _isRightOwner(uint _car_Id) {
+    // Checking for being sure it is owner
+    modifier _isOwner(uint _car_Id) {
         require(carToOwner[_car_Id] == msg.sender, "You are not the owner of this car!");
         _;
     }
 
-    // function register(string memory _name ) public {
-    //     //customers.push(Customer(_name, _address)); // bunu cikardim, bunu mapping ile halledicem
-    //     customer_Id[msg.sender] = customer_count;
-    //     customer_count = customer_count.add(1);
-    //     // Customer memory customer;
-    //     // customer.name = _name;
-    //     // customer.adres = _adres;
-    //     // users.push(customer);
-    // }
-
-    function createCar(string memory _brand, uint _price) public {
-        uint carId = cars.push(Car(_brand, _price, false, false)) - 1;
+    // Add car ,which create by user, to cars array
+    function addYourCar(string memory _brand, uint _price) public {
+        cars.push(Car(_brand, _price, false)); // This car created now so is_second_hand status set to false.
+        onSaleCars.push(cars[carId]);
         carToOwner[carId] = msg.sender;
-        customer_car_count[msg.sender] = customer_car_count[msg.sender].add(1);
-
-        //customer_Id[msg.sender] = customer_Id[msg.sender].add(1);
-        // Car memory car;
-        // car.brand = _brand;
-        // car.price = _price;
-        // car.owner = _owner;
-        // car.isSecondHand = _isSecondHand;
+        isSelling[carId] = true;
+        carId = carId.add(1);
+        customerCarCount[msg.sender] = customerCarCount[msg.sender].add(1);
+        emit carAdded(carId, msg.sender);
     }
 
-    function buy_car(uint _Id ) public {
-        carToOwner[cars[_Id]] = msg.sender;
-        customer_car_count(msg.sender)++;
+    // Change the car`s owner by car`s Id
+    function buyCar(uint _Id) public {
+        require(carToOwner[_Id] != msg.sender, "You are already owner of this car.");
+        require(isSelling[_Id], "This car is not selling!");
+        cars[_Id].is_second_hand = true;  // After buying the car it is going to be second hand.
+        address previous_owner = carToOwner[_Id]; // For be able to emit the previous owner
+        carToOwner[_Id] = msg.sender;
+        customerCarCount[msg.sender] = customerCarCount[msg.sender].add(1);
+        customerCarCount[previous_owner] = customerCarCount[previous_owner].sub(1);
+        emit carSold(_Id, msg.sender, previous_owner, cars[_Id].price);
     }
 
-    function putOnSale(uint _car_Id) _is_there(_car_Id) _isRightOwner(_car_Id) public {
-        on_sale_cars.push(cars[_car_Id]);
-        on_sale_cars[_car_Id].is_selling = true;
+    // Change the sales status of car by car`s Id
+    function changeSalesStatus(uint _Id, bool _is_on_sale) _isOwner(_Id) public {
+        require(isSelling[_Id] != _is_on_sale, "Your car`s already like you want."); // To avoid the unnecessary gas consumption.
+        isSelling[_Id] = _is_on_sale;
+        if (_is_on_sale == true) {
+            onSaleCars.push(cars[_Id]);
+        } else if (_is_on_sale == false) {
+            delete onSaleCars[_Id];
+        }
+        emit statusChanced(_Id, _is_on_sale);
     }
 
-    function changePrice() public {
-
+    // Change the car`s price.
+    function changePrice(uint _Id, uint _new_price) _isOwner(_Id) public {
+        uint previous_price = cars[_Id].price; // For be able to emit the previous price
+        cars[_Id].price = _new_price;
+        emit priceChanged(_Id, msg.sender, previous_price, _new_price);
     }
-    
-    // modifier _is_registered(address _adres) {
-    //     require(is_registered[_adres] = 0;, "Costumer already joined the chain!");
-    //     _;
-    // }  // cikardim bunu da, musteri kaydetmeye gerek yok. adresleri var zaten.
 
+    // Show how many cars exist.
+    function carsCount() external view returns(uint) {
+        return cars.length; // Also can be use carId + 1
+    }
+
+    // Liste yerine front-end de kullanabilmek icin enumerableSet.uintSet
 }

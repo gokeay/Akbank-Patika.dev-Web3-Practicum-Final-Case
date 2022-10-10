@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
-// import "github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/EnumerableSet.sol";
+import "./Token.sol";
 
-contract car_production{
+contract car_production {
 
-    // using EnumerableSet for EnumerableSet.UintSet;
-    // EnumerableSet.UintSet private myUintSet;
-
+    CARToken Token;
     address ownerAddress;
+
+    event joined(address user, bool GetWelcomePayment);
 
     event carAdded(uint carId, address indexed owner);
 
@@ -38,7 +38,6 @@ contract car_production{
     }
 
     Car[] public cars;
-    // add(uintSet storage myUintSet, uint256 5);
 
     // Mapping from car"s Id to owner address
     mapping(uint => address) public carToOwner;
@@ -46,8 +45,13 @@ contract car_production{
     mapping(address => uint) public customerCarCount;
     // Mapping from car`s Id to sales status of car
     mapping(uint => bool) public isSelling;
+    // Mapping from user's address to user's balance
+    mapping(address => uint) balanceOf;
+    // Mapping from user's address to bool, for avoid multiple welcome payments 
+    mapping(address => bool) getWelcomeMoney;
 
-    constructor() {
+    constructor(address tokenAddress) {
+        Token = CARToken(tokenAddress);
         ownerAddress = msg.sender;
     }
 
@@ -55,6 +59,15 @@ contract car_production{
     modifier _isOwner(uint _car_Id) {
         require(carToOwner[_car_Id] == msg.sender, "You are not the owner of this car!");
         _;
+    }
+
+    // System do not have ability to give token to the users acording to their real money.
+    // So to be able to make system work, all users will take car token for once after they added car.
+    function getWelcomePayment(address _user) public {
+        require(!getWelcomeMoney[_user], "You have already took your welcome payment.");
+        balanceOf[msg.sender] += 200;
+        getWelcomeMoney[_user] = true;
+        emit joined(msg.sender, getWelcomeMoney[_user]);
     }
 
     // Add car ,which create by user, to cars array
@@ -75,7 +88,9 @@ contract car_production{
         address previous_owner = carToOwner[_Id]; // For be able to emit the previous owner
         carToOwner[_Id] = msg.sender;
         customerCarCount[msg.sender] += 1;
-        customerCarCount[previous_owner] += 1;
+        customerCarCount[previous_owner] -= 1;
+        balanceOf[msg.sender] -= cars[_Id].price;
+        balanceOf[previous_owner] += cars[_Id].price;
         emit carSold(_Id, msg.sender, previous_owner, cars[_Id].price);
     }
 
@@ -98,5 +113,4 @@ contract car_production{
         return cars.length; // Also can be use carId + 1
     }
 
-    // Liste yerine front-end de kullanabilmek icin enumerableSet.uintSet
 }

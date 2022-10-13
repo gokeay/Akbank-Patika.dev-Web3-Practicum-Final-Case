@@ -12,6 +12,8 @@ contract car_production {
 
     event carAdded(uint carId, address indexed owner);
 
+    event statusOfSale(uint carId, bool onSale);
+
     event carSold(
         uint carId,
         address indexed newOwner,
@@ -26,8 +28,6 @@ contract car_production {
         uint newPrice
     );
 
-    event statusOfSale(uint carId, bool onSale);
-
     // It is used to generate id for new cars.
     uint carId;
 
@@ -41,10 +41,10 @@ contract car_production {
 
     // Mapping from car"s Id to owner address
     mapping(uint => address) public carToOwner;
-    // Mapping from owner address to amount of owner`s car
-    mapping(address => uint) public customerCarCount;
     // Mapping from car`s Id to sales status of car
     mapping(uint => bool) public isSelling;
+    // Mapping from owner address to amount of owner`s car
+    mapping(address => uint) public customerCarCount;
     // Mapping from user's address to user's balance
     mapping(address => uint) balanceOf;
     // Mapping from user's address to bool, for avoid multiple welcome payments 
@@ -55,7 +55,7 @@ contract car_production {
         ownerAddress = msg.sender;
     }
 
-    // Checking for being sure it is owner
+    // Checking for being sure it is owner of the car
     modifier _isOwner(uint _car_Id) {
         require(carToOwner[_car_Id] == msg.sender, "You are not the owner of this car!");
         _;
